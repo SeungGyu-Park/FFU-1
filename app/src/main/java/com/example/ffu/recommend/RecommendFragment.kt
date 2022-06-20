@@ -74,14 +74,14 @@ class RecommendFragment : Fragment(), OnMapReadyCallback {
     private fun getMatchedUsers() {
 
         recommendButton.setOnClickListener {
-            //RecommendData.MBTISet.forEach { v -> Log.d("MBTISet", "${v}") }
-            //RecommendData.hobbySet.forEach { v -> Log.d("hobbySet", "${v}") }
-            //RecommendData.personalitySet.forEach { v -> Log.d("personalitySet", "${v}") }
 
             val usersUid: ArrayList<String> = UserInformation.MAP_USER
             val myRadius = RecommendData.myRadius / 1000.0
             val recommendUsersUid = ArrayList<String>()
-            val userMatched = mutableMapOf<String, Int>()
+            val mbtiMatched = mutableMapOf<String, Int>()
+            val hobbyMatched = mutableMapOf<String, Int>()
+            val personalityMatched = mutableMapOf<String, Int>()
+            val finalMatched = mutableMapOf<String, Int>()
             var realMatched = mutableMapOf<String, Int>()
 
             for (uid in usersUid) {
@@ -96,7 +96,6 @@ class RecommendFragment : Fragment(), OnMapReadyCallback {
                 if (distance < myRadius) {
                     recommendUsersUid.add(uid)
                     RecommendData.distanceUsers[uid] = distance * 1000.0
-                    userMatched[uid] = 0
                 }
             }
 
@@ -107,42 +106,47 @@ class RecommendFragment : Fragment(), OnMapReadyCallback {
             for (mbti in RecommendData.MBTISet) {
                 for (uid in recommendUsersUid) {
                     if (PROFILE[uid]?.mbti?.contains(mbti) == true) {
-                        userMatched[uid] = 1
+                        mbtiMatched[uid] = 1
+                        hobbyMatched[uid] = 0
                     }
                 }
             }
-
             for (hobby in RecommendData.hobbySet) {
-                for (uid in recommendUsersUid) {
+                for (uid in mbtiMatched.keys) {
                     if (PROFILE[uid]?.hobby?.contains(hobby) == true) {
-                        userMatched[uid] = userMatched[uid]!! + 1
+                        hobbyMatched[uid] = hobbyMatched[uid]!! + 1
+                        personalityMatched[uid] = 0
                     }
                 }
             }
 
             for (personality in RecommendData.personalitySet) {
-                for (uid in recommendUsersUid) {
+                for (uid in hobbyMatched.keys) {
                     if (PROFILE[uid]?.personality?.contains(personality) == true) {
-                        userMatched[uid] = userMatched[uid]!! + 1
+                        personalityMatched[uid] = personalityMatched[uid]!! + 1
+                        finalMatched[uid] = 0
                     }
                 }
             }
 
-            if (!RecommendData.smokingCheck) {
-                for (uid in recommendUsersUid) {
-                    if (PROFILE[uid]?.smoke?.equals("흡연") == true) {
-                        userMatched[uid] = 0
+            if (RecommendData.smokingCheck) {
+                for (uid in personalityMatched.keys) {
+                    finalMatched[uid] = personalityMatched[uid]!! + hobbyMatched[uid]!!
+                }
+            } else {
+                for (uid in personalityMatched.keys) {
+                    if (PROFILE[uid]?.smoke?.equals("흡연") == false) {
+                        finalMatched[uid] = personalityMatched[uid]!! + hobbyMatched[uid]!!
                     }
                 }
             }
 
-            userMatched.forEach { (k, v) -> Log.d("finalMatched", "${k}, ${v}") }
+            finalMatched.forEach { (k, v) -> Log.d("finalMatched", "${k}, ${v}") }
 
-            for(userId in userMatched.keys){
+            for(userId in finalMatched.keys){
                 //이미 LIKE 또는 DISLIKE를 보내거나 받은 유저이면 recommend에 뜨지 않게 한다.
-                if(UserInformation.CURRENT_USERID !=userId && !UserInformation.SEND_LIKE_USER.containsKey(userId)
-                    && !UserInformation.RECEIVED_LIKE_USER.containsKey(userId) && userMatched[userId] != 0){
-                    realMatched[userId] = userMatched[userId]!!
+                if(CURRENT_USERID !=userId && !UserInformation.SEND_LIKE_USER.containsKey(userId) && !UserInformation.RECEIVED_LIKE_USER.containsKey(userId)){
+                    realMatched[userId] = finalMatched[userId]!!
                 }
             }
 
@@ -150,7 +154,7 @@ class RecommendFragment : Fragment(), OnMapReadyCallback {
             realMatched.forEach { (k, v) -> Log.d("realfinal", "${k}: ${v}") }
 
             if (realMatched.isEmpty()) {
-                Toast.makeText(requireContext(), "추천할 대상이 없습니다.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "선택한 조건에 매치되는 친구가 없습니다.\n다시 선택해주세요", Toast.LENGTH_SHORT).show()
             } else {
                 val bottomSheet = RecommendList(realMatched)
                 bottomSheet.show(childFragmentManager, RecommendList.TAG)
@@ -216,8 +220,8 @@ class RecommendFragment : Fragment(), OnMapReadyCallback {
         RecommendData.naverMap.minZoom = 7.0
         RecommendData.naverMap.maxZoom = 14.0
 
-        RecommendData.naverMap.moveCamera(CameraUpdate.scrollTo(LatLng(RECOMMEND[CURRENT_USERID]!!.latitude, RECOMMEND[CURRENT_USERID]!!.longitude)))
-//        RecommendData.naverMap.moveCamera(CameraUpdate.scrollTo(LatLng(37.5509, 126.9410)))
+//        RecommendData.naverMap.moveCamera(CameraUpdate.scrollTo(LatLng(RECOMMEND[CURRENT_USERID]!!.latitude, RECOMMEND[CURRENT_USERID]!!.longitude)))
+        RecommendData.naverMap.moveCamera(CameraUpdate.scrollTo(LatLng(37.5509, 126.9410)))
         RecommendData.naverMap.uiSettings.isLocationButtonEnabled = true
         RecommendData.naverMap.locationSource =
             FusedLocationSource(this@RecommendFragment, REQUEST_ACCESS_LOCATION_PERMISSIONS)
